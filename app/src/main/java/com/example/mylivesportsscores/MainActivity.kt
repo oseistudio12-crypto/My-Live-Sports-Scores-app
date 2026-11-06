@@ -24,12 +24,7 @@ import com.example.mylivesportsscores.ui.viewmodel.HomeViewModel
 import com.example.mylivesportsscores.util.configureAppCheck
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.mylivesportsscores.data.repository.SportRepository
-import com.example.mylivesportsscores.data.remote.SportApi
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import com.example.mylivesportsscores.data.repository.MultiSportRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,20 +38,8 @@ class MainActivity : ComponentActivity() {
         val authManager = AuthManager(applicationContext)
         val firestoreRepository = FirestoreRepository(applicationContext)
         
-        // Secure Backend Integration
-        val backendUrl = if (BuildConfig.BACKEND_URL.startsWith("https")) {
-            BuildConfig.BACKEND_URL
-        } else {
-            "https://placeholder-url.com/" // Fallback to prevent crash, user must configure
-        }
-        
-        val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-        val retrofit = Retrofit.Builder()
-            .baseUrl(backendUrl)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
-        val sportApi = retrofit.create(SportApi::class.java)
-        val sportRepository = SportRepository(sportApi)
+
+        val multiSportRepository = MultiSportRepository()
 
         setContent {
             MyLiveSportsScoresTheme {
@@ -75,7 +58,7 @@ class MainActivity : ComponentActivity() {
                     AppContent(
                         authViewModel = authViewModel,
                         firestoreRepository = firestoreRepository,
-                        sportRepository = sportRepository
+                        multiSportRepository = multiSportRepository
                     )
                 }
             }
@@ -87,7 +70,7 @@ class MainActivity : ComponentActivity() {
 fun AppContent(
     authViewModel: AuthViewModel,
     firestoreRepository: FirestoreRepository,
-    sportRepository: SportRepository
+    multiSportRepository: MultiSportRepository
 ) {
     val user by authViewModel.user.collectAsState()
 
@@ -101,7 +84,7 @@ fun AppContent(
         val homeViewModel: HomeViewModel = viewModel(
             factory = object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return HomeViewModel(sportRepository) as T
+                    return HomeViewModel(multiSportRepository) as T
                 }
             }
         )

@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mylivesportsscores.data.model.NewsArticle
 import com.example.mylivesportsscores.data.model.SportMatch
-import com.example.mylivesportsscores.data.repository.SportRepository
+import com.example.mylivesportsscores.data.repository.MultiSportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +16,7 @@ sealed interface HomeUiState {
     data class Error(val message: String) : HomeUiState
 }
 
-class HomeViewModel(private val sportRepository: SportRepository) : ViewModel() {
+class HomeViewModel(private val multiSportRepository: MultiSportRepository) : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -28,17 +28,15 @@ class HomeViewModel(private val sportRepository: SportRepository) : ViewModel() 
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                // 1. Try to load live in-play scores first
-                var matches = sportRepository.getLiveScores()
+                // Fetch scores for non-football sports
+                val basketballMatches = multiSportRepository.getScoresForSport("Basketball")
+                val tennisMatches = multiSportRepository.getScoresForSport("Tennis")
                 
-                // 2. If no in-play matches, load today's scheduled fixtures
-                if (matches.isEmpty()) {
-                    matches = sportRepository.getFixturesToday()
-                }
-
-                _uiState.value = HomeUiState.Success(matches, emptyList())
+                val allMatches = basketballMatches + tennisMatches
+                
+                _uiState.value = HomeUiState.Success(allMatches, emptyList())
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Failed to load data from secure backend")
+                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Failed to load multi-sport data")
             }
         }
     }
