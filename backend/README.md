@@ -22,6 +22,8 @@ Once deployed, update the `BACKEND_URL` in your Android application's `Retrofit`
 4. `npm run dev`
 
 ## Testing
-- Health Check: `GET /api/sports/health`
+- Health Check: `GET /health`
+- Diagnostics: `GET /api/sports/diagnostics` (Checks subscription and free leagues)
+- Today's Fixtures: `GET /api/sports/fixtures/today` (Danish/Scottish leagues)
 - Live Scores: `GET /api/sports/livescores`
 - Fixtures: `GET /api/sports/fixtures`
