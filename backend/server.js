@@ -31,10 +31,9 @@ const sportmonks = axios.create({
 
 // Request interceptor for logging
 sportmonks.interceptors.request.use(config => {
-  const maskedToken = SPORTMONKS_TOKEN ? `${SPORTMONKS_TOKEN.substring(0, 5)}...` : 'MISSING';
   console.log(`[Sportmonks Request] ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
   console.log(`[Params]`, config.params);
-  console.log(`[Auth Header Sent] ${maskedToken}`);
+  console.log(`[Auth Header Present] ${!!SPORTMONKS_TOKEN}`);
   return config;
 });
 
@@ -63,7 +62,13 @@ app.get('/health', (req, res) => {
   });
 });
 
+const DIAGNOSTICS_SECRET = process.env.DIAGNOSTICS_SECRET;
+
 app.get('/api/sports/diagnostics', async (req, res) => {
+  if (DIAGNOSTICS_SECRET && req.query.secret !== DIAGNOSTICS_SECRET) {
+    return res.status(403).json({ error: "Unauthorized access to diagnostics" });
+  }
+
   try {
     const subscription = await sportmonks.get('/my/subscription');
     const leaguesResponse = await sportmonks.get('/leagues');
@@ -93,7 +98,7 @@ app.get('/api/sports/health', (req, res) => {
 app.get('/api/sports/livescores', async (req, res) => {
   try {
     const response = await sportmonks.get('/livescores/inplay', {
-      params: { include: 'participants;scores;events;league' }
+      params: { include: 'participants;scores;events;league;state' }
     });
     if (response.data.data.length === 0) {
       return res.json({
@@ -111,7 +116,7 @@ app.get('/api/sports/livescores', async (req, res) => {
 app.get('/api/sports/livescores/inplay', async (req, res) => {
   try {
     const response = await sportmonks.get('/livescores/inplay', {
-      params: { include: 'participants;scores;events;league' }
+      params: { include: 'participants;scores;events;league;state' }
     });
     res.json(response.data);
   } catch (error) {
@@ -122,7 +127,7 @@ app.get('/api/sports/livescores/inplay', async (req, res) => {
 app.get('/api/sports/livescores/latest', async (req, res) => {
   try {
     const response = await sportmonks.get('/livescores', {
-      params: { include: 'participants;scores;events;league' }
+      params: { include: 'participants;scores;events;league;state' }
     });
     res.json(response.data);
   } catch (error) {
@@ -135,8 +140,8 @@ app.get('/api/sports/fixtures/today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const response = await sportmonks.get(`/fixtures/date/${today}`, {
       params: { 
-        include: 'participants;scores;league',
-        filters: 'leagueIds:271,501'
+        include: 'participants;scores;league;state',
+        filters: 'fixtureLeagues:501,271'
       }
     });
     res.json(response.data);
@@ -148,7 +153,7 @@ app.get('/api/sports/fixtures/today', async (req, res) => {
 app.get('/api/sports/fixtures', async (req, res) => {
   try {
     const response = await sportmonks.get('/fixtures', {
-      params: { include: 'participants;scores;league' }
+      params: { include: 'participants;scores;league;state' }
     });
     res.json(response.data);
   } catch (error) {

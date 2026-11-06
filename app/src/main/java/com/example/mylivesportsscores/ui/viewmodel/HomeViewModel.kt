@@ -28,8 +28,14 @@ class HomeViewModel(private val sportRepository: SportRepository) : ViewModel() 
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                val matches = sportRepository.getLiveScores()
-                // For newsArticles, we'll use a placeholder or empty list for now since news wasn't in the specific Sportmonks endpoints requested
+                // 1. Try to load live in-play scores first
+                var matches = sportRepository.getLiveScores()
+                
+                // 2. If no in-play matches, load today's scheduled fixtures
+                if (matches.isEmpty()) {
+                    matches = sportRepository.getFixturesToday()
+                }
+
                 _uiState.value = HomeUiState.Success(matches, emptyList())
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Failed to load data from secure backend")

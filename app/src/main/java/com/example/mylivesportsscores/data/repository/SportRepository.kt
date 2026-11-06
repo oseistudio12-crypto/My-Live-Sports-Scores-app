@@ -21,6 +21,16 @@ class SportRepository(private val api: SportApi) {
         }
     }
 
+    suspend fun getFixturesToday(): List<SportMatch> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getFixturesToday()
+            response.data.map { mapToSportMatch(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching today's fixtures", e)
+            throw e
+        }
+    }
+
     suspend fun getFixtures(): List<SportMatch> = withContext(Dispatchers.IO) {
         try {
             val response = api.getFixtures()
@@ -44,16 +54,23 @@ class SportRepository(private val api: SportApi) {
     }
 
     private fun mapToSportMatch(fixture: FixtureData): SportMatch {
-        val homeTeam = fixture.participants?.find { it.meta?.location == "home" }?.name ?: "Unknown"
-        val awayTeam = fixture.participants?.find { it.meta?.location == "away" }?.name ?: "Unknown"
+        val participants = fixture.participants ?: emptyList()
+        val homeParticipant = participants.find { it.meta?.location == "home" }
+        val awayParticipant = participants.find { it.meta?.location == "away" }
         
-        val homeScore = fixture.scores?.find { 
-            it.description == "CURRENT" && it.score?.participant_id == fixture.participants?.find { p -> p.meta?.location == "home" }?.id 
-        }?.score?.goals?.toString() ?: "0"
+        val homeTeam = homeParticipant?.name ?: "Unknown"
+        val awayTeam = awayParticipant?.name ?: "Unknown"
         
-        val awayScore = fixture.scores?.find { 
-            it.description == "CURRENT" && it.score?.participant_id == fixture.participants?.find { p -> p.meta?.location == "away" }?.id 
-        }?.score?.goals?.toString() ?: "0"
+        val scores = fixture.scores ?: emptyList()
+        
+        // Find current scores for home and away
+        val homeScore = homeParticipant?.let { home ->
+            scores.find { it.description == "CURRENT" && it.score?.participant_id == home.id }?.score?.goals
+        }
+        
+        val awayScore = awayParticipant?.let { away ->
+            scores.find { it.description == "CURRENT" && it.score?.participant_id == away.id }?.score?.goals
+        }
 
         return SportMatch(
             id = fixture.id.toString(),
@@ -61,8 +78,8 @@ class SportRepository(private val api: SportApi) {
             awayTeam = awayTeam,
             homeScore = homeScore,
             awayScore = awayScore,
-            status = fixture.result_info ?: "Scheduled",
-            timestamp = 0, // Should parse starting_at if needed
+            status = fixture.state?.name ?: fixture.state?.short_name ?: "NS",
+            startingAt = fixture.starting_at ?: "",
             league = fixture.league?.name ?: "Unknown",
             sport = "Soccer"
         )

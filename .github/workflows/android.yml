@@ -28,14 +28,26 @@ jobs:
     - name: Prepare environment
       run: |
         cp .env.example .env
-        # Restore debug keystore from base64 if available (it is ignored in Git but its base64 might be present)
-        if [ -f debug.keystore.base64 ]; then
+        
+        # Restore debug keystore from secret, or local base64, or generate a temporary one
+        if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+          echo "Restoring debug keystore from GitHub Secret..."
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+        elif [ -f debug.keystore.base64 ]; then
+          echo "Restoring debug keystore from local base64..."
           base64 -d debug.keystore.base64 > debug.keystore
+        else
+          echo "Generating temporary debug keystore..."
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         fi
+        
         # Create a dummy google-services.json if it's missing to satisfy the plugin during build
         if [ ! -f app/google-services.json ]; then
           echo '{"project_info":{"project_number":"0","project_id":"dummy","storage_bucket":"dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"com.example.mylivesportsscores"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{}}],"configuration_version":"1"}' > app/google-services.json
         fi
+
+    - name: Run Tests
+      run: gradle test
 
     - name: Build with Gradle
       run: gradle assembleDebug

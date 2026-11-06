@@ -46,12 +46,16 @@ fun HomeScreen(
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
                 is HomeUiState.Success -> {
-                    HomeContent(
-                        matches = state.matches,
-                        news = state.news,
-                        favorites = favorites,
-                        onToggleFavorite = onToggleFavorite
-                    )
+                    if (state.matches.isEmpty()) {
+                        EmptyHomeContent(onRefresh = { viewModel.refreshData() })
+                    } else {
+                        HomeContent(
+                            matches = state.matches,
+                            news = state.news,
+                            favorites = favorites,
+                            onToggleFavorite = onToggleFavorite
+                        )
+                    }
                 }
                 is HomeUiState.Error -> {
                     Text(
@@ -61,6 +65,21 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun EmptyHomeContent(onRefresh: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("No matches or fixtures found for today.")
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = onRefresh) {
+            Text("Retry")
         }
     }
 }
@@ -79,7 +98,7 @@ fun HomeContent(
     ) {
         item {
             Text(
-                text = "Live Scores",
+                text = "Live & Scheduled Matches",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -95,17 +114,19 @@ fun HomeContent(
             )
         }
 
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Sports News",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        if (news.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Sports News",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-        items(news) { article ->
-            NewsCard(article = article)
+            items(news) { article ->
+                NewsCard(article = article)
+            }
         }
     }
 }
@@ -134,7 +155,7 @@ fun MatchCard(
                 Text(
                     text = match.status,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (match.status == "Live") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                    color = if (match.status.contains("Live", ignoreCase = true)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
                 )
                 IconButton(onClick = onToggleFavorite) {
                     Icon(
@@ -145,7 +166,14 @@ fun MatchCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (match.startingAt.isNotEmpty()) {
+                Text(
+                    text = "Starts at: ${match.startingAt}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -154,12 +182,16 @@ fun MatchCard(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = match.homeTeam, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text(text = match.homeScore, style = MaterialTheme.typography.headlineMedium)
+                    if (match.homeScore != null) {
+                        Text(text = match.homeScore.toString(), style = MaterialTheme.typography.headlineMedium)
+                    }
                 }
                 Text(text = "vs", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 8.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = match.awayTeam, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text(text = match.awayScore, style = MaterialTheme.typography.headlineMedium)
+                    if (match.awayScore != null) {
+                        Text(text = match.awayScore.toString(), style = MaterialTheme.typography.headlineMedium)
+                    }
                 }
             }
         }
@@ -179,7 +211,6 @@ fun NewsCard(article: NewsArticle) {
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(text = article.source, style = MaterialTheme.typography.labelSmall)
-                // Text(text = article.timestamp.toString(), style = MaterialTheme.typography.labelSmall)
             }
         }
     }

@@ -29,10 +29,10 @@ data class SportMatch(
     val id: String = "",
     val homeTeam: String = "",
     val awayTeam: String = "",
-    val homeScore: String = "",
-    val awayScore: String = "",
-    val status: String = "", // Live, Finished, Scheduled
-    val timestamp: Long = 0,
+    val homeScore: Int? = null,
+    val awayScore: Int? = null,
+    val status: String = "",
+    val startingAt: String = "",
     val league: String = "",
     val sport: String = ""
 )

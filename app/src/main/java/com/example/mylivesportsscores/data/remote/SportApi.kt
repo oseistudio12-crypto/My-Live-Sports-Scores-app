@@ -16,10 +16,18 @@ data class FixtureData(
     val name: String,
     val starting_at: String?,
     val result_info: String?,
+    val state: StateData?,
     val league: LeagueData?,
     val participants: List<ParticipantData>?,
     val scores: List<ScoreData>?,
     val events: List<EventData>?
+)
+
+@JsonClass(generateAdapter = true)
+data class StateData(
+    val id: Int?,
+    val name: String?,
+    val short_name: String?
 )
 
 @JsonClass(generateAdapter = true)
@@ -67,6 +75,9 @@ data class EventData(
 interface SportApi {
     @GET("api/sports/livescores")
     suspend fun getLiveScores(): SportmonksResponse<List<FixtureData>>
+
+    @GET("api/sports/fixtures/today")
+    suspend fun getFixturesToday(): SportmonksResponse<List<FixtureData>>
 
     @GET("api/sports/fixtures")
     suspend fun getFixtures(): SportmonksResponse<List<FixtureData>>
