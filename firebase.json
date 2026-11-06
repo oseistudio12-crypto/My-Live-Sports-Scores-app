@@ -1,0 +1,21 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "databases": {
+      "ai-studio-android-mylivesp-ee5f6e46-f224-44c5-ada0-71439b031241": {
+        "rules": "firestore.rules"
+      }
+    }
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}

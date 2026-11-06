@@ -1,0 +1,6 @@
+{
+  "name": "My Live Sports Scores",
+  "description": "Native Android app for live sports scores, schedules, standings, and sports news.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User Profile Validation
+    function isValidUser(data) {
+      return data.favoriteTeams is list && data.favoriteTeams.size() <= 100 &&
+             data.favoriteLeagues is list && data.favoriteLeagues.size() <= 100 &&
+             (!('notificationsEnabled' in data) || data.notificationsEnabled is bool);
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+                       incoming().keys().hasAll(['favoriteTeams', 'favoriteLeagues']) &&
+                       isValidUser(incoming());
+      allow update: if isOwner(userId) &&
+                       isValidUser(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['favoriteTeams', 'favoriteLeagues', 'notificationsEnabled']);
+      allow delete: if isOwner(userId);
+    }
+
+    // Favorite Validation
+    function isValidFavorite(data) {
+      return data.userId == request.auth.uid &&
+             data.type in ['team', 'player', 'competition'] &&
+             data.targetId is string && data.targetId.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500));
+    }
+
+    match /favorites/{favoriteId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       isValidId(favoriteId) &&
+                       incoming().keys().hasAll(['userId', 'type', 'targetId', 'name']) &&
+                       isValidFavorite(incoming());
+      allow update: if isSignedIn() &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       isValidFavorite(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'imageUrl']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

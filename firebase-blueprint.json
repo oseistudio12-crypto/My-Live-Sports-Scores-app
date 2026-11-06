@@ -1,0 +1,26 @@
+{
+  "collections": {
+    "users": {
+      "description": "User profiles and favorites",
+      "documents": {
+        "userId": {
+          "favoriteTeams": "array of strings",
+          "favoriteLeagues": "array of strings",
+          "notificationsEnabled": "boolean"
+        }
+      }
+    },
+    "favorites": {
+      "description": "User specific favorites (teams/players/competitions)",
+      "documents": {
+        "favoriteId": {
+          "userId": "string",
+          "type": "string (team|player|competition)",
+          "targetId": "string",
+          "name": "string",
+          "imageUrl": "string"
+        }
+      }
+    }
+  }
+}
