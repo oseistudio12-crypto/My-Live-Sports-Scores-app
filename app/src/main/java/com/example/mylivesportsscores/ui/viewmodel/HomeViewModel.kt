@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mylivesportsscores.data.model.NewsArticle
 import com.example.mylivesportsscores.data.model.SportMatch
-import com.example.mylivesportsscores.data.repository.MultiSportRepository
+import com.example.mylivesportsscores.data.repository.SportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +16,7 @@ sealed interface HomeUiState {
     data class Error(val message: String) : HomeUiState
 }
 
-class HomeViewModel(private val multiSportRepository: MultiSportRepository) : ViewModel() {
+class HomeViewModel(private val sportRepository: SportRepository) : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -28,15 +28,15 @@ class HomeViewModel(private val multiSportRepository: MultiSportRepository) : Vi
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                // Fetch scores for non-football sports
-                val basketballMatches = multiSportRepository.getScoresForSport("Basketball")
-                val tennisMatches = multiSportRepository.getScoresForSport("Tennis")
+                // Fetch real football data
+                val liveScores = sportRepository.getLiveScores()
+                val fixtures = sportRepository.getTodayFixtures()
                 
-                val allMatches = basketballMatches + tennisMatches
+                val allMatches = (liveScores + fixtures).distinctBy { it.id }
                 
                 _uiState.value = HomeUiState.Success(allMatches, emptyList())
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Failed to load multi-sport data")
+                _uiState.value = HomeUiState.Error(e.localizedMessage ?: "Failed to load football data")
             }
         }
     }

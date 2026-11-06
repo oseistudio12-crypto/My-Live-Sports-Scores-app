@@ -22,12 +22,20 @@ import androidx.navigation.compose.rememberNavController
 import com.example.mylivesportsscores.ui.viewmodel.AuthViewModel
 import com.example.mylivesportsscores.ui.viewmodel.FavoritesViewModel
 import com.example.mylivesportsscores.ui.viewmodel.HomeViewModel
+import com.example.mylivesportsscores.data.repository.SportRepository
+import com.example.mylivesportsscores.data.repository.AiRepository
+import com.example.mylivesportsscores.ui.viewmodel.MatchDetailViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 
 @Composable
 fun MainScreen(
     authViewModel: AuthViewModel,
     homeViewModel: HomeViewModel,
-    favoritesViewModel: FavoritesViewModel
+    favoritesViewModel: FavoritesViewModel,
+    sportRepository: SportRepository,
+    aiRepository: AiRepository
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -88,7 +96,24 @@ fun MainScreen(
                         } else {
                             favoritesViewModel.addFavorite(type, id, name, null)
                         }
+                    },
+                    onMatchClick = { matchId ->
+                        navController.navigate("match_detail/$matchId")
                     }
+                )
+            }
+            composable("match_detail/{matchId}") { backStackEntry ->
+                val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+                val matchDetailViewModel: MatchDetailViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return MatchDetailViewModel(sportRepository, aiRepository, matchId) as T
+                        }
+                    }
+                )
+                MatchDetailScreen(
+                    viewModel = matchDetailViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("favorites") {

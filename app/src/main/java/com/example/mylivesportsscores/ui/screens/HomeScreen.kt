@@ -24,7 +24,8 @@ import com.example.mylivesportsscores.ui.viewmodel.HomeViewModel
 fun HomeScreen(
     viewModel: HomeViewModel,
     favorites: List<String>,
-    onToggleFavorite: (String, String, String) -> Unit
+    onToggleFavorite: (String, String, String) -> Unit,
+    onMatchClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -53,7 +54,8 @@ fun HomeScreen(
                             matches = state.matches,
                             news = state.news,
                             favorites = favorites,
-                            onToggleFavorite = onToggleFavorite
+                            onToggleFavorite = onToggleFavorite,
+                            onMatchClick = onMatchClick
                         )
                     }
                 }
@@ -89,7 +91,8 @@ fun HomeContent(
     matches: List<SportMatch>,
     news: List<NewsArticle>,
     favorites: List<String>,
-    onToggleFavorite: (String, String, String) -> Unit
+    onToggleFavorite: (String, String, String) -> Unit,
+    onMatchClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -110,7 +113,8 @@ fun HomeContent(
                 isFavorite = favorites.contains("${match.homeTeam}_vs_${match.awayTeam}"),
                 onToggleFavorite = {
                     onToggleFavorite("match", "${match.homeTeam}_vs_${match.awayTeam}", "${match.homeTeam} vs ${match.awayTeam}")
-                }
+                },
+                onClick = { onMatchClick(match.id) }
             )
         }
 
@@ -135,10 +139,11 @@ fun HomeContent(
 fun MatchCard(
     match: SportMatch,
     isFavorite: Boolean,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
