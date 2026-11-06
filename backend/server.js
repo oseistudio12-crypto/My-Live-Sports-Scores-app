@@ -42,6 +42,13 @@ const handleApiError = (res, error) => {
 };
 
 // Endpoints
+app.get('/health', (req, res) => {
+  res.json({
+    status: "ok",
+    service: "My Live Sports Scores Backend"
+  });
+});
+
 app.get('/api/sports/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -49,6 +56,28 @@ app.get('/api/sports/health', (req, res) => {
 app.get('/api/sports/livescores', async (req, res) => {
   try {
     const response = await sportmonks.get('/livescores/inplay', {
+      params: { include: 'participants;scores;events;league' }
+    });
+    res.json(response.data);
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get('/api/sports/livescores/inplay', async (req, res) => {
+  try {
+    const response = await sportmonks.get('/livescores/inplay', {
+      params: { include: 'participants;scores;events;league' }
+    });
+    res.json(response.data);
+  } catch (error) {
+    handleApiError(res, error);
+  }
+});
+
+app.get('/api/sports/livescores/latest', async (req, res) => {
+  try {
+    const response = await sportmonks.get('/livescores', {
       params: { include: 'participants;scores;events;league' }
     });
     res.json(response.data);
@@ -113,6 +142,6 @@ app.get('/api/sports/top-scorers', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend proxy server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend proxy server running on port ${PORT} and listening on 0.0.0.0`);
 });
