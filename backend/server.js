@@ -9,6 +9,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Root route
+app.get('/', (req, res) => {
+    res.send('<h1>OSEI LIVE Backend</h1><p>Status: Active</p><p>Endpoints: /health, /api/sports/livescores, /api/sports/fixtures, /api/sports/diagnostics</p>');
+});
+
 const SPORTMONKS_TOKEN = process.env.SPORTMONKS_TOKEN;
 const FOOTBALL_DATA_TOKEN = process.env.FOOTBALL_DATA_TOKEN || process.env.FOOTBALL_DATA_API_KEY;
 const API_FOOTBALL_TOKEN = process.env.API_FOOTBALL_TOKEN || process.env.API_FOOTBALL_KEY;
@@ -39,39 +44,40 @@ const apiFootball = axios.create({
 
 // Translation helper: Football-Data.org -> Sportmonks v3
 function translateFootballDataToSportmonks(match) {
+    if (!match) return null;
     return {
-        id: `FD_${match.id}`, // Prefix to distinguish from Sportmonks
-        name: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        starting_at: match.utcDate,
-        result_info: match.status,
+        id: `FD_${match.id}`,
+        name: `${match.homeTeam?.name || 'Unknown'} vs ${match.awayTeam?.name || 'Unknown'}`,
+        starting_at: match.utcDate || '',
+        result_info: match.status || '',
         league: {
-            id: match.competition.id,
-            name: match.competition.name,
-            image_path: match.competition.emblem
+            id: match.competition?.id || 0,
+            name: match.competition?.name || 'Unknown League',
+            image_path: match.competition?.emblem
         },
         participants: [
             {
-                id: match.homeTeam.id,
-                name: match.homeTeam.shortName || match.homeTeam.name,
-                image_path: match.homeTeam.crest,
+                id: match.homeTeam?.id || 0,
+                name: match.homeTeam?.shortName || match.homeTeam?.name || 'Home',
+                image_path: match.homeTeam?.crest,
                 meta: { location: 'home' }
             },
             {
-                id: match.awayTeam.id,
-                name: match.awayTeam.shortName || match.awayTeam.name,
-                image_path: match.awayTeam.crest,
+                id: match.awayTeam?.id || 0,
+                name: match.awayTeam?.shortName || match.awayTeam?.name || 'Away',
+                image_path: match.awayTeam?.crest,
                 meta: { location: 'away' }
             }
         ],
         scores: [
             {
-                participant_id: match.homeTeam.id,
-                score: { goals: match.score.fullTime.home },
+                participant_id: match.homeTeam?.id || 0,
+                score: { goals: match.score?.fullTime?.home },
                 description: 'CURRENT'
             },
             {
-                participant_id: match.awayTeam.id,
-                score: { goals: match.score.fullTime.away },
+                participant_id: match.awayTeam?.id || 0,
+                score: { goals: match.score?.fullTime?.away },
                 description: 'CURRENT'
             }
         ],
@@ -81,57 +87,56 @@ function translateFootballDataToSportmonks(match) {
 
 // Translation helper: API-Football -> Sportmonks v3
 function translateApiFootballToSportmonks(item) {
-    const { fixture, league, teams, goals, score } = item;
+    if (!item) return null;
+    const { fixture, league, teams, goals } = item;
     return {
-        id: `AF_${fixture.id}`,
-        name: `${teams.home.name} vs ${teams.away.name}`,
-        starting_at: fixture.date,
-        result_info: fixture.status.long,
+        id: `AF_${fixture?.id || 0}`,
+        name: `${teams?.home?.name || 'Home'} vs ${teams?.away?.name || 'Away'}`,
+        starting_at: fixture?.date || '',
+        result_info: fixture?.status?.long || '',
         league: {
-            id: league.id,
-            name: league.name,
-            image_path: league.logo,
-            country: { name: league.country, image_path: league.flag }
+            id: league?.id || 0,
+            name: league?.name || 'Unknown League',
+            image_path: league?.logo,
+            country: { name: league?.country, image_path: league?.flag }
         },
         participants: [
             {
-                id: teams.home.id,
-                name: teams.home.name,
-                image_path: teams.home.logo,
+                id: teams?.home?.id || 0,
+                name: teams?.home?.name || 'Home',
+                image_path: teams?.home?.logo,
                 meta: { location: 'home' }
             },
             {
-                id: teams.away.id,
-                name: teams.away.name,
-                image_path: teams.away.logo,
+                id: teams?.away?.id || 0,
+                name: teams?.away?.name || 'Away',
+                image_path: teams?.away?.logo,
                 meta: { location: 'away' }
             }
         ],
         scores: [
             {
-                participant_id: teams.home.id,
-                score: { goals: goals.home },
+                participant_id: teams?.home?.id || 0,
+                score: { goals: goals?.home },
                 description: 'CURRENT'
             },
             {
-                participant_id: teams.away.id,
-                score: { goals: goals.away },
+                participant_id: teams?.away?.id || 0,
+                score: { goals: goals?.away },
                 description: 'CURRENT'
             }
         ],
         events: item.events ? item.events.map(e => ({
-            minute: e.time.elapsed,
-            player_name: e.player.name,
-            type_id: e.type === 'Goal' ? 1 : (e.type === 'Card' ? 2 : 4) // Simplified mapping
+            minute: e.time?.elapsed || 0,
+            player_name: e.player?.name || 'Unknown',
+            type_id: e.type === 'Goal' ? 1 : (e.type === 'Card' ? 2 : 4)
         })) : []
     };
 }
 
-
 // Translate FD Match Detail (matches single match response)
 function translateFDDetailToSportmonks(match) {
     const base = translateFootballDataToSportmonks(match);
-    // Add lineups or stats if available in detail view
     return base;
 }
 
@@ -141,7 +146,12 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         service: 'Osei Live Sports Scores Backend',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        config: {
+            sportmonks: !!SPORTMONKS_TOKEN,
+            football_data: !!FOOTBALL_DATA_TOKEN,
+            api_football: !!API_FOOTBALL_TOKEN
+        }
     });
 });
 
