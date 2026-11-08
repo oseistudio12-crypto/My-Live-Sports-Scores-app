@@ -23,11 +23,19 @@ class StandingsViewModel(private val sportRepository: SportRepository) : ViewMod
     val uiState: StateFlow<StandingsUiState> = _uiState.asStateFlow()
 
     private val leagues = mapOf(
-        "8" to "Premier League",
-        "564" to "La Liga",
-        "82" to "Bundesliga",
-        "384" to "Serie A",
-        "2" to "Champions League",
+        "PL" to "Premier League",
+        "PD" to "La Liga",
+        "BL1" to "Bundesliga",
+        "SA" to "Serie A",
+        "FL1" to "Ligue 1",
+        "CL" to "Champions League",
+        "DED" to "Eredivisie",
+        "BSA" to "Série A (Brazil)",
+        "PPL" to "Primeira Liga",
+        "ELC" to "Championship",
+        "EC" to "European Championship",
+        "WC" to "World Cup",
+        "8" to "Premier League (SM)", // Keeping for testing/fallback
         "501" to "Scottish Premiership",
         "271" to "Danish Superliga",
         "451" to "Ghana Premier League"
