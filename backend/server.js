@@ -11,13 +11,16 @@ app.use(express.json());
 
 const SPORTMONKS_TOKEN = process.env.SPORTMONKS_TOKEN;
 const FOOTBALL_DATA_TOKEN = process.env.FOOTBALL_DATA_TOKEN || process.env.FOOTBALL_DATA_API_KEY;
+const API_FOOTBALL_TOKEN = process.env.API_FOOTBALL_TOKEN || process.env.API_FOOTBALL_KEY;
 
 const BASE_URL = 'https://api.sportmonks.com/v3/football';
 const FOOTBALL_DATA_URL = 'https://api.football-data.org/v4';
+const API_FOOTBALL_URL = 'https://v3.football.api-sports.io';
 
 // Verify tokens on startup
 if (!SPORTMONKS_TOKEN) console.error('SPORTMONKS_TOKEN is not set.');
-if (!FOOTBALL_DATA_TOKEN) console.warn('FOOTBALL_DATA_TOKEN is not set. Football-Data.org features will be disabled.');
+if (!FOOTBALL_DATA_TOKEN) console.warn('FOOTBALL_DATA_TOKEN is not set.');
+if (!API_FOOTBALL_TOKEN) console.warn('API_FOOTBALL_TOKEN is not set. Ghana data may be unavailable.');
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -27,6 +30,11 @@ const api = axios.create({
 const footballDataApi = axios.create({
     baseURL: FOOTBALL_DATA_URL,
     headers: { 'X-Auth-Token': FOOTBALL_DATA_TOKEN }
+});
+
+const apiFootball = axios.create({
+    baseURL: API_FOOTBALL_URL,
+    headers: { 'x-apisports-key': API_FOOTBALL_TOKEN }
 });
 
 // Translation helper: Football-Data.org -> Sportmonks v3
@@ -71,6 +79,55 @@ function translateFootballDataToSportmonks(match) {
     };
 }
 
+// Translation helper: API-Football -> Sportmonks v3
+function translateApiFootballToSportmonks(item) {
+    const { fixture, league, teams, goals, score } = item;
+    return {
+        id: `AF_${fixture.id}`,
+        name: `${teams.home.name} vs ${teams.away.name}`,
+        starting_at: fixture.date,
+        result_info: fixture.status.long,
+        league: {
+            id: league.id,
+            name: league.name,
+            image_path: league.logo,
+            country: { name: league.country, image_path: league.flag }
+        },
+        participants: [
+            {
+                id: teams.home.id,
+                name: teams.home.name,
+                image_path: teams.home.logo,
+                meta: { location: 'home' }
+            },
+            {
+                id: teams.away.id,
+                name: teams.away.name,
+                image_path: teams.away.logo,
+                meta: { location: 'away' }
+            }
+        ],
+        scores: [
+            {
+                participant_id: teams.home.id,
+                score: { goals: goals.home },
+                description: 'CURRENT'
+            },
+            {
+                participant_id: teams.away.id,
+                score: { goals: goals.away },
+                description: 'CURRENT'
+            }
+        ],
+        events: item.events ? item.events.map(e => ({
+            minute: e.time.elapsed,
+            player_name: e.player.name,
+            type_id: e.type === 'Goal' ? 1 : (e.type === 'Card' ? 2 : 4) // Simplified mapping
+        })) : []
+    };
+}
+
+
 // Translate FD Match Detail (matches single match response)
 function translateFDDetailToSportmonks(match) {
     const base = translateFootballDataToSportmonks(match);
@@ -90,25 +147,38 @@ app.get('/health', (req, res) => {
 
 // Diagnostics
 app.get('/api/sports/diagnostics', async (req, res) => {
+    const report = {
+        status: 'ok',
+        providers: {
+            sportmonks: { configured: !!SPORTMONKS_TOKEN, status: 'pending' },
+            football_data: { configured: !!FOOTBALL_DATA_TOKEN, status: 'pending' },
+            api_football: { configured: !!API_FOOTBALL_TOKEN, status: 'pending' }
+        }
+    };
+
+    // Check Sportmonks
     try {
-        const response = await api.get('/leagues');
-        const accessibleLeagues = response.data.data.map(l => ({
-            id: l.id,
-            name: l.name,
-            type: l.type
-        }));
-        res.json({
-            status: 'success',
-            token_configured: !!SPORTMONKS_TOKEN,
-            accessible_leagues: accessibleLeagues
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to fetch diagnostics',
-            error: error.response?.data || error.message
-        });
+        await api.get('/leagues');
+        report.providers.sportmonks.status = 'active';
+    } catch (e) { report.providers.sportmonks.status = 'error'; }
+
+    // Check Football-Data
+    if (FOOTBALL_DATA_TOKEN) {
+        try {
+            await footballDataApi.get('/competitions');
+            report.providers.football_data.status = 'active';
+        } catch (e) { report.providers.football_data.status = 'error'; }
     }
+
+    // Check API-Football
+    if (API_FOOTBALL_TOKEN) {
+        try {
+            await apiFootball.get('/leagues', { params: { country: 'Ghana' } });
+            report.providers.api_football.status = 'active';
+        } catch (e) { report.providers.api_football.status = 'error'; }
+    }
+
+    res.json(report);
 });
 
 // Livescores
@@ -133,6 +203,17 @@ app.get('/api/sports/livescores', async (req, res) => {
                     results.push(...translated);
                 }
             } catch (e) { console.error('Football-Data livescores failed', e.message); }
+        }
+
+        // 3. Try API-Football
+        if (API_FOOTBALL_TOKEN) {
+            try {
+                const afResponse = await apiFootball.get('/fixtures', { params: { live: 'all' } });
+                if (afResponse.data.response) {
+                    const translated = afResponse.data.response.map(translateApiFootballToSportmonks);
+                    results.push(...translated);
+                }
+            } catch (e) { console.error('API-Football livescores failed', e.message); }
         }
 
         res.json({ data: results });
@@ -173,6 +254,20 @@ app.get('/api/sports/fixtures', async (req, res) => {
             } catch (e) { console.error('Football-Data fixtures failed', e.message); }
         }
 
+        // 3. Try API-Football
+        if (API_FOOTBALL_TOKEN) {
+            try {
+                const params = {};
+                if (date) params.date = date;
+                else params.date = new Date().toISOString().split('T')[0];
+                const afResponse = await apiFootball.get('/fixtures', { params });
+                if (afResponse.data.response) {
+                    const translated = afResponse.data.response.map(translateApiFootballToSportmonks);
+                    results.push(...translated);
+                }
+            } catch (e) { console.error('API-Football fixtures failed', e.message); }
+        }
+
         res.json({ data: results });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -192,7 +287,18 @@ app.get('/api/sports/fixtures/:id', async (req, res) => {
             return res.json({ data: translated });
         }
 
-        // 2. Default to Sportmonks
+        // 2. Check if it's an API-Football match
+        if (id.startsWith('AF_')) {
+            const originalId = id.replace('AF_', '');
+            const response = await apiFootball.get('/fixtures', { params: { id: originalId } });
+            if (response.data.response && response.data.response[0]) {
+                const translated = translateApiFootballToSportmonks(response.data.response[0]);
+                return res.json({ data: translated });
+            }
+            throw new Error('Match not found');
+        }
+
+        // 3. Default to Sportmonks
         const response = await api.get(`/fixtures/${id}`, {
             params: {
                 include: 'participants;scores;events;league.country;statistics;lineups;formations'
@@ -250,12 +356,47 @@ function translateFDStandingToSportmonks(tableEntry) {
     };
 }
 
+// Translation helper: AF Standing -> Sportmonks format
+function translateAFStandingToSportmonks(standingItem) {
+    return {
+        position: standingItem.rank,
+        points: standingItem.points,
+        participant_id: standingItem.team.id,
+        participant: {
+            id: standingItem.team.id,
+            name: standingItem.team.name,
+            image_path: standingItem.team.logo
+        },
+        details: [
+            { type: { code: 'played' }, value: standingItem.all.played },
+            { type: { code: 'won' }, value: standingItem.all.win },
+            { type: { code: 'draw' }, value: standingItem.all.draw },
+            { type: { code: 'lost' }, value: standingItem.all.lose },
+            { type: { code: 'goals-for' }, value: standingItem.all.goals.for },
+            { type: { code: 'goals-against' }, value: standingItem.all.goals.against }
+        ]
+    };
+}
+
 // Standings by League
 app.get('/api/sports/standings/leagues/:id', async (req, res) => {
     try {
         const id = req.params.id;
 
-        // 1. Check if it's a Football-Data.org code (non-numeric or specific code)
+        // 1. Check if it's an API-Football code (prefixed with AF_ or Ghana ID)
+        if (id.startsWith('AF_') || id === '277') {
+            const leagueId = id.replace('AF_', '');
+            if (!API_FOOTBALL_TOKEN) throw new Error('API-Football token not configured');
+            const response = await apiFootball.get('/standings', { params: { league: leagueId, season: new Date().getFullYear() } });
+            if (response.data.response && response.data.response[0]) {
+                const standings = response.data.response[0].league.standings[0];
+                const translated = standings.map(translateAFStandingToSportmonks);
+                return res.json({ data: translated });
+            }
+            throw new Error('Standing not found');
+        }
+
+        // 2. Check if it's a Football-Data.org code (non-numeric or specific code)
         const fdCodes = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'DED', 'BSA', 'PPL', 'ELC', 'CL', 'EC', 'WC'];
         if (isNaN(id) || fdCodes.includes(id)) {
             if (!FOOTBALL_DATA_TOKEN) throw new Error('Football-Data token not configured');
@@ -269,7 +410,7 @@ app.get('/api/sports/standings/leagues/:id', async (req, res) => {
             throw new Error('Table not found');
         }
 
-        // 2. Default to Sportmonks
+        // 3. Default to Sportmonks
         try {
             const response = await api.get(`/standings/live/leagues/${id}`, {
                 params: { include: 'participant;details' }

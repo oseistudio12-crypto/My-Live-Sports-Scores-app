@@ -38,7 +38,7 @@ class StandingsViewModel(private val sportRepository: SportRepository) : ViewMod
         "8" to "Premier League (SM)", // Keeping for testing/fallback
         "501" to "Scottish Premiership",
         "271" to "Danish Superliga",
-        "451" to "Ghana Premier League"
+        "AF_277" to "Ghana Premier League"
     )
 
     init {
