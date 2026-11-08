@@ -13,8 +13,15 @@ import kotlinx.coroutines.launch
 
 sealed interface MatchDetailUiState {
     data object Loading : MatchDetailUiState
-    data class Success(val fixture: SportmonksFixture, val aiSummary: String) : MatchDetailUiState
+    data class Success(
+        val fixture: SportmonksFixture,
+        val aiSummary: String
+    ) : MatchDetailUiState
     data class Error(val message: String) : MatchDetailUiState
+}
+
+enum class MatchDetailTab {
+    OVERVIEW, STATS, LINEUPS
 }
 
 class MatchDetailViewModel(
@@ -26,17 +33,24 @@ class MatchDetailViewModel(
     private val _uiState = MutableStateFlow<MatchDetailUiState>(MatchDetailUiState.Loading)
     val uiState: StateFlow<MatchDetailUiState> = _uiState.asStateFlow()
 
+    private val _selectedTab = MutableStateFlow(MatchDetailTab.OVERVIEW)
+    val selectedTab: StateFlow<MatchDetailTab> = _selectedTab.asStateFlow()
+
     init {
         loadMatchDetails()
     }
 
-    private fun loadMatchDetails() {
+    fun setSelectedTab(tab: MatchDetailTab) {
+        _selectedTab.value = tab
+    }
+
+    fun loadMatchDetails() {
         viewModelScope.launch {
             _uiState.value = MatchDetailUiState.Loading
             try {
                 val fixture = sportRepository.getMatchDetails(matchId)
                 if (fixture != null) {
-                    // Fetch AI summary
+                    // Fetch AI summary only for OVERVIEW or if needed
                     val sportMatch = fixture.toSportMatch()
                     val summary = aiRepository.getMatchSummary(sportMatch)
                     _uiState.value = MatchDetailUiState.Success(fixture, summary)
@@ -49,7 +63,6 @@ class MatchDetailViewModel(
         }
     }
 
-    // Helper to map fixture to SportMatch (could be moved to repository or utility)
     private fun SportmonksFixture.toSportMatch(): SportMatch {
         val homeParticipant = participants.find { it.meta?.location == "home" }
         val awayParticipant = participants.find { it.meta?.location == "away" }

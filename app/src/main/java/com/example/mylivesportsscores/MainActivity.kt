@@ -17,10 +17,11 @@ import com.example.mylivesportsscores.data.repository.AuthManager
 import com.example.mylivesportsscores.data.repository.FirestoreRepository
 import com.example.mylivesportsscores.ui.screens.MainScreen
 import com.example.mylivesportsscores.ui.screens.SignInScreen
-import com.example.mylivesportsscores.ui.theme.MyLiveSportsScoresTheme
+import com.example.mylivesportsscores.ui.theme.OseiLiveSportsScoresTheme
 import com.example.mylivesportsscores.ui.viewmodel.AuthViewModel
 import com.example.mylivesportsscores.ui.viewmodel.FavoritesViewModel
 import com.example.mylivesportsscores.ui.viewmodel.HomeViewModel
+import com.example.mylivesportsscores.ui.viewmodel.StandingsViewModel
 import com.example.mylivesportsscores.data.repository.AiRepository
 import com.example.mylivesportsscores.util.configureAppCheck
 import androidx.lifecycle.ViewModel
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
         val aiRepository = AiRepository()
 
         setContent {
-            MyLiveSportsScoresTheme {
+            OseiLiveSportsScoresTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -118,10 +119,19 @@ fun AppContent(
             }
         )
 
+        val standingsViewModel: StandingsViewModel = viewModel(
+            factory = object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return StandingsViewModel(sportRepository) as T
+                }
+            }
+        )
+
         MainScreen(
             authViewModel = authViewModel,
             homeViewModel = homeViewModel,
             favoritesViewModel = favoritesViewModel,
+            standingsViewModel = standingsViewModel,
             sportRepository = sportRepository,
             aiRepository = aiRepository
         )

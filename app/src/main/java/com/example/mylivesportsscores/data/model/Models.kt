@@ -34,7 +34,11 @@ data class SportMatch(
     val status: String = "",
     val startingAt: String = "",
     val league: String = "",
-    val sport: String = ""
+    val sport: String = "",
+    val homeLogoUrl: String? = null,
+    val awayLogoUrl: String? = null,
+    val leagueLogoUrl: String? = null,
+    val countryLogoUrl: String? = null
 )
 
 data class NewsArticle(

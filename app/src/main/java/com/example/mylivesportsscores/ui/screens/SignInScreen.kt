@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.mylivesportsscores.ui.viewmodel.AuthViewModel
 
@@ -22,9 +23,17 @@ fun SignInScreen(viewModel: AuthViewModel) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "My Live Sports Scores",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 32.dp)
+            text = "OSEI LIVE",
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Text(
+            text = "Professional Sports Scores",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(bottom = 48.dp)
         )
 
         Button(

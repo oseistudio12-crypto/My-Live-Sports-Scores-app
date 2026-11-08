@@ -28,7 +28,7 @@ const api = axios.create({
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'My Live Sports Scores Backend',
+        service: 'Osei Live Sports Scores Backend',
         timestamp: new Date().toISOString()
     });
 });
@@ -62,7 +62,7 @@ app.get('/api/sports/livescores', async (req, res) => {
         // Includes: participants, scores, events
         const response = await api.get('/livescores', {
             params: {
-                include: 'participants;scores;events;league'
+                include: 'participants;scores;events;league.country'
             }
         });
         res.json(response.data);
@@ -71,12 +71,18 @@ app.get('/api/sports/livescores', async (req, res) => {
     }
 });
 
-// Today's fixtures
+// Today's fixtures or by date
 app.get('/api/sports/fixtures', async (req, res) => {
     try {
-        const response = await api.get('/fixtures', {
+        const { date } = req.query; // YYYY-MM-DD
+        let endpoint = '/fixtures';
+        if (date) {
+            endpoint = `/fixtures/date/${date}`;
+        }
+
+        const response = await api.get(endpoint, {
             params: {
-                include: 'participants;scores;league'
+                include: 'participants;scores;league.country'
             }
         });
         res.json(response.data);
@@ -90,7 +96,7 @@ app.get('/api/sports/fixtures/:id', async (req, res) => {
     try {
         const response = await api.get(`/fixtures/${req.params.id}`, {
             params: {
-                include: 'participants;scores;events;league'
+                include: 'participants;scores;events;league.country;statistics;lineups;formations'
             }
         });
         res.json(response.data);
@@ -102,7 +108,11 @@ app.get('/api/sports/fixtures/:id', async (req, res) => {
 // Leagues
 app.get('/api/sports/leagues', async (req, res) => {
     try {
-        const response = await api.get('/leagues');
+        const response = await api.get('/leagues', {
+            params: {
+                include: 'country'
+            }
+        });
         res.json(response.data);
     } catch (error) {
         res.status(error.response?.status || 500).json(error.response?.data || { message: error.message });
@@ -116,6 +126,30 @@ app.get('/api/sports/standings', async (req, res) => {
         res.json(response.data);
     } catch (error) {
         res.status(error.response?.status || 500).json(error.response?.data || { message: error.message });
+    }
+});
+
+// Standings by League
+app.get('/api/sports/standings/leagues/:id', async (req, res) => {
+    try {
+        const response = await api.get(`/standings/live/leagues/${req.params.id}`, {
+            params: {
+                include: 'participant;details'
+            }
+        });
+        res.json(response.data);
+    } catch (error) {
+        // Fallback to season standings if live standings not available
+        try {
+            const response = await api.get(`/standings/seasons/${req.params.id}`, {
+                params: {
+                    include: 'participant;details'
+                }
+            });
+            res.json(response.data);
+        } catch (innerError) {
+            res.status(error.response?.status || 500).json(error.response?.data || { message: error.message });
+        }
     }
 });
 

@@ -1,72 +1,203 @@
 package com.example.mylivesportsscores.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.mylivesportsscores.data.model.NewsArticle
 import com.example.mylivesportsscores.data.model.SportMatch
 import com.example.mylivesportsscores.ui.viewmodel.HomeUiState
 import com.example.mylivesportsscores.ui.viewmodel.HomeViewModel
+import com.example.mylivesportsscores.ui.viewmodel.MatchFilter
+import coil.compose.AsyncImage
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
     favorites: List<String>,
-    onToggleFavorite: (String, String, String) -> Unit,
+    onToggleFavorite: (String, String, String, String?) -> Unit,
     onMatchClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    val selectedFilter by viewModel.selectedFilter.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    
+    var isSearchActive by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Home") },
+                title = { 
+                    if (isSearchActive) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                            placeholder = { Text("Search teams or leagues...") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent
+                            )
+                        )
+                    } else {
+                        Text(
+                            "OSEI LIVE",
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
                 actions = {
-                    IconButton(onClick = { viewModel.refreshData() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    IconButton(onClick = { 
+                        isSearchActive = !isSearchActive 
+                        if (!isSearchActive) viewModel.setSearchQuery("")
+                    }) {
+                        Icon(if (isSearchActive) Icons.Default.Close else Icons.Default.Search, contentDescription = "Search")
+                    }
+                    if (!isSearchActive) {
+                        IconButton(onClick = { viewModel.refreshData() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
                     }
                 }
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            when (val state = uiState) {
-                is HomeUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                is HomeUiState.Success -> {
-                    if (state.matches.isEmpty()) {
-                        EmptyHomeContent(onRefresh = { viewModel.refreshData() })
-                    } else {
-                        HomeContent(
-                            matches = state.matches,
-                            news = state.news,
-                            favorites = favorites,
-                            onToggleFavorite = onToggleFavorite,
-                            onMatchClick = onMatchClick
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            DateCalendar(
+                selectedDate = selectedDate,
+                onDateSelected = { viewModel.setDate(it) }
+            )
+            
+            FilterRow(
+                selectedFilter = selectedFilter,
+                onFilterSelected = { viewModel.setFilter(it) }
+            )
+
+            Box(modifier = Modifier.weight(1f)) {
+                when (val state = uiState) {
+                    is HomeUiState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    is HomeUiState.Success -> {
+                        if (state.filteredMatches.isEmpty()) {
+                            EmptyHomeContent(onRefresh = { viewModel.refreshData() })
+                        } else {
+                            HomeContent(
+                                matches = state.filteredMatches,
+                                news = state.news,
+                                favorites = favorites,
+                                onToggleFavorite = onToggleFavorite,
+                                onMatchClick = onMatchClick
+                            )
+                        }
+                    }
+                    is HomeUiState.Error -> {
+                        Text(
+                            text = state.message,
+                            modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
-                is HomeUiState.Error -> {
+            }
+        }
+    }
+}
+
+@Composable
+fun DateCalendar(
+    selectedDate: Calendar,
+    onDateSelected: (Calendar) -> Unit
+) {
+    val dates = remember {
+        (-3..3).map { offset ->
+            Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, offset) }
+        }
+    }
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp)
+    ) {
+        items(dates) { date ->
+            val isSelected = isSameDay(date, selectedDate)
+            val dayName = SimpleDateFormat("EEE", Locale.US).format(date.time)
+            val dayNumber = SimpleDateFormat("dd", Locale.US).format(date.time)
+
+            Card(
+                onClick = { onDateSelected(date) },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                ),
+                modifier = Modifier.width(60.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = state.message,
-                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
-                        color = MaterialTheme.colorScheme.error
+                        text = dayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = dayNumber,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun FilterRow(
+    selectedFilter: MatchFilter,
+    onFilterSelected: (MatchFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        MatchFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = selectedFilter == filter,
+                onClick = { onFilterSelected(filter) },
+                label = { Text(filter.name) }
+            )
         }
     }
 }
@@ -78,10 +209,10 @@ fun EmptyHomeContent(onRefresh: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("No matches or fixtures found for today.")
+        Text("No matches found for this date or filter.", textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = onRefresh) {
-            Text("Retry")
+            Text("Refresh")
         }
     }
 }
@@ -91,52 +222,74 @@ fun HomeContent(
     matches: List<SportMatch>,
     news: List<NewsArticle>,
     favorites: List<String>,
-    onToggleFavorite: (String, String, String) -> Unit,
+    onToggleFavorite: (String, String, String, String?) -> Unit,
     onMatchClick: (String) -> Unit
 ) {
+    val groupedMatches = matches.groupBy { it.league }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Text(
-                text = "Live & Scheduled Matches",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        items(matches) { match ->
-            MatchCard(
-                match = match,
-                isFavorite = favorites.contains("${match.homeTeam}_vs_${match.awayTeam}"),
-                onToggleFavorite = {
-                    onToggleFavorite("match", "${match.homeTeam}_vs_${match.awayTeam}", "${match.homeTeam} vs ${match.awayTeam}")
-                },
-                onClick = { onMatchClick(match.id) }
-            )
-        }
-
-        if (news.isNotEmpty()) {
+        groupedMatches.forEach { (league, leagueMatches) ->
             item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Sports News",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                val firstMatch = leagueMatches.firstOrNull()
+                CompetitionHeader(league, firstMatch?.leagueLogoUrl, firstMatch?.countryLogoUrl)
             }
-
-            items(news) { article ->
-                NewsCard(article = article)
+            items(leagueMatches) { match ->
+                ProfessionalMatchCard(
+                    match = match,
+                    isFavorite = favorites.contains("${match.homeTeam}_vs_${match.awayTeam}"),
+                    onToggleFavorite = {
+                        onToggleFavorite("match", "${match.homeTeam}_vs_${match.awayTeam}", "${match.homeTeam} vs ${match.awayTeam}", match.homeLogoUrl)
+                    },
+                    onClick = { onMatchClick(match.id) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun MatchCard(
+fun CompetitionHeader(league: String, logoUrl: String?, countryLogoUrl: String?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (countryLogoUrl != null) {
+            AsyncImage(
+                model = countryLogoUrl,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        
+        AsyncImage(
+            model = logoUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(24.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = league,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+fun ProfessionalMatchCard(
     match: SportMatch,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
@@ -144,79 +297,113 @@ fun MatchCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = match.league,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = match.status,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (match.status.contains("Live", ignoreCase = true)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-                )
-                IconButton(onClick = onToggleFavorite) {
+                val isLive = match.status.contains("Live", ignoreCase = true) || match.status.contains("INPLAY", ignoreCase = true)
+                
+                Surface(
+                    color = if (isLive) Color.Red else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = match.status.uppercase(),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isLive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.outline
                     )
                 }
             }
 
-            if (match.startingAt.isNotEmpty()) {
-                Text(
-                    text = "Starts at: ${match.startingAt}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(text = match.homeTeam, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    if (match.homeScore != null) {
-                        Text(text = match.homeScore.toString(), style = MaterialTheme.typography.headlineMedium)
+                // Home Team
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AsyncImage(
+                        model = match.homeLogoUrl,
+                        contentDescription = "Home Logo",
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(20.dp))
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = match.homeTeam,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+
+                // Score or Time
+                Column(
+                    modifier = Modifier.width(80.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (match.homeScore != null && match.awayScore != null) {
+                        Text(
+                            text = "${match.homeScore} - ${match.awayScore}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = match.startingAt.takeLast(5),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                Text(text = "vs", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 8.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(text = match.awayTeam, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    if (match.awayScore != null) {
-                        Text(text = match.awayScore.toString(), style = MaterialTheme.typography.headlineMedium)
-                    }
+
+                // Away Team
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AsyncImage(
+                        model = match.awayLogoUrl,
+                        contentDescription = "Away Logo",
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(20.dp))
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = match.awayTeam,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
                 }
             }
         }
     }
 }
 
-@Composable
-fun NewsCard(article: NewsArticle) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = article.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = article.summary, style = MaterialTheme.typography.bodyMedium, maxLines = 3)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(text = article.source, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
+private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }
